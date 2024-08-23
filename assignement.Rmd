@@ -1,0 +1,37 @@
+---
+title: "Calculating ecosystem gas fluxes with the Fluxible R package"
+author: "Joseph Gaudard"
+date: "`r Sys.Date()`"
+output: pdf_document
+bibliography: /home/jga051/Dropbox/PhD/biblio_phd_zot.bib
+csl: /home/jga051/Documents/01_PhD/emerald-harvard.csl
+classoption: a4paper
+header-includes:
+   - \usepackage{amsmath}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+# About the Fluxible R package
+
+For this example we will use the devellopment version of Fluxible (@fluxible).
+It can be installed from the `next_version` branch.
+```{r install}
+devtools::install_github("plant-functional-trait-course/fluxible@next_version")
+```
+
+
+
+# Preparing the data
+
+# Fitting models and estimating the slopes
+
+# Checking the quality
+
+# Calculating the fluxes
+
+# Comparing the methods
