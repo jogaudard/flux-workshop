@@ -17,6 +17,8 @@ knitr::opts_chunk$set(
 )
 ```
 # About the Fluxible R package
+[The Fluxible R package](https://plant-functional-trait-course.github.io/fluxible/index.html) is designed to process ecosystem gas fluxes measurements from raw concentration over time measurements into a clean dataset of gas fluxes in a reproducible and automated method.
+The workflow includes both automated quality control and visual control by the user.
 
 For this example we will use the devellopment version of Fluxible (@fluxible).
 It can be installed from the `next_version` branch.
@@ -24,14 +26,196 @@ It can be installed from the `next_version` branch.
 devtools::install_github("plant-functional-trait-course/fluxible@next_version")
 ```
 
+For a quick overview of the workflow, a poster is available [here](https://github.com/Plant-Functional-Trait-Course/fluxible/blob/main/dissemination/poster_EGU24_jgaudard.pdf)
 
 
 # Preparing the data
 
-# Fitting models and estimating the slopes
+```{r load_data}
+library(tidyverse)
+library(fluxible)
 
-# Checking the quality
+all_measurements <- read_csv("data.csv")
 
-# Calculating the fluxes
+str(all_measurements)
+```
 
-# Comparing the methods
+We will calculate the fluxes for each gases seperately and re assemble the dataset after wards, it might be easier.
+The workflow with the Fluxible R package would normally starts with the `flux_match` function to attribute fluxID and meta data.
+We will skip this step because the dataset is already containing all the meta data we need (and fluxID as ChamID).
+Because we skipped `flux_match`, we are missine the columns `f_start` and `f_end` (which are the start and the end of the measurements).
+Let's just make them.
+
+```{r add_cols}
+all_measurements <- all_measurements |>
+  group_by(ChamID) |>
+  mutate(
+    f_start = min(DATE_TIME),
+    f_end = max(DATE_TIME),
+    Area = Area * 0.0001 # we need the area in sqm
+  ) |>
+  ungroup() |> # some measurement have the same datetime (logger issue?)
+ # we just keep the first row for those overlapping measurement
+  distinct(DATE_TIME, ChamID, .keep_all = TRUE)
+str(all_measurements)
+```
+
+# CO~2~
+
+## Fitting models and estimating the slopes
+
+```{r co2_fitting}
+co2_slopes_exp <- flux_fitting(
+  conc_df = all_measurements,
+  start_cut = 0,
+  end_cut = 0,
+  start_col = "f_start",
+  end_col = "f_end",
+  datetime_col = "DATE_TIME",
+  conc_col = "CO2dry_ppm",
+  fluxid_col = "ChamID",
+  fit_type = "exponential"
+)
+
+str(co2_slopes_exp)
+
+co2_slopes_qua <- flux_fitting(
+  conc_df = all_measurements,
+  start_cut = 0,
+  end_cut = 0,
+  start_col = "f_start",
+  end_col = "f_end",
+  datetime_col = "DATE_TIME",
+  conc_col = "CO2dry_ppm",
+  fluxid_col = "ChamID",
+  fit_type = "quadratic"
+)
+
+str(co2_slopes_qua)
+
+co2_slopes_lin <- flux_fitting(
+  conc_df = all_measurements,
+  start_cut = 0,
+  end_cut = 0,
+  start_col = "f_start",
+  end_col = "f_end",
+  datetime_col = "DATE_TIME",
+  conc_col = "CO2dry_ppm",
+  fluxid_col = "ChamID",
+  fit_type = "linear"
+)
+
+str(co2_slopes_lin)
+```
+
+## Checking the quality
+
+```{r co2_quality}
+co2_slopes_exp_flag <- flux_quality(co2_slopes_exp)
+
+str(co2_slopes_exp_flag)
+
+co2_slopes_qua_flag <- flux_quality(co2_slopes_qua)
+
+str(co2_slopes_qua_flag)
+
+co2_slopes_lin_flag <- flux_quality(co2_slopes_lin)
+
+str(co2_slopes_lin_flag)
+```
+
+After adding the quality flags we can plot the fluxes to visually check them.
+
+```{r co2_plot}
+co2_slopes_exp_flag  |>
+  flux_plot(f_ylim_lower = 300,
+            f_ylim_upper = 600)
+
+co2_slopes_qua_flag  |>
+  flux_plot(f_ylim_lower = 300,
+            f_ylim_upper = 600)
+
+co2_slopes_lin_flag  |>
+  flux_plot(f_ylim_lower = 300,
+            f_ylim_upper = 600)
+```
+It seems that we are getting the best fits with the exponential model.
+We could also try to cut the end or start (argument `end_cut` or `start_cut` in `flux_fitting`) of the measurements to improve the fits.
+
+## Calculating the fluxes
+
+```{r }
+co2_fluxes_exp <- flux_calc(co2_slopes_exp_flag,
+                            slope_col = "f_slope_corr",
+                            conc_unit = "ppm",
+                            flux_unit = "mmol",
+                            chamber_volume = "Vtot",
+                            tube_volume = 0,
+                            plot_area = "Area",
+                            cols_keep = c("Analyzer", "Note", "f_quality_flag"),
+                            cols_ave = c("Tsoil", "PAR"),
+                            fluxid_col = "f_fluxID",
+                            temp_air_col = "Tcham")
+
+View(co2_fluxes_exp)
+```
+
+<!-- ## Comparing the methods -->
+
+# CH~4~
+
+## Fitting models and estimating the slopes
+
+```{r }
+
+```
+
+## Checking the quality
+
+```{r }
+
+```
+
+## Calculating the fluxes
+
+```{r }
+
+```
+
+## Comparing the methods
+
+```{r }
+
+```
+
+# N~2~O
+
+## Fitting models and estimating the slopes
+
+```{r }
+
+```
+
+## Checking the quality
+
+```{r }
+
+```
+
+## Calculating the fluxes
+
+```{r }
+
+```
+
+## Comparing the methods
+
+```{r }
+
+```
+
+# Re merging the dataset
+
+```{r }
+
+```
