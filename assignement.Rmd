@@ -156,6 +156,7 @@ co2_slopes_lin_flag  |>
             f_date_breaks = "2 min")
 ```
 It seems that we are getting the best fits with the exponential model.
+The exponential model we use here is described in @zhaoCalculationDaytimeCO22018.
 We could also try to cut the end or start (argument `end_cut` or `start_cut` in `flux_fitting`) of the measurements to improve the fits.
 
 ## Calculating the fluxes
@@ -172,15 +173,13 @@ co2_fluxes_exp <- flux_calc(co2_slopes_exp_flag,
                             cols_ave = c("Tsoil", "PAR"),
                             fluxid_col = "f_fluxID",
                             temp_air_col = "Tcham") |>
-  rename(
-    flux_co2 = "flux", # to avoid any confusion later
-    model_co2 = "model",
-    slope_co2 = "f_slope_calc"
+  mutate(
+    gas = "CO2" # to avoid any confusion later
   )
 
 # printing the columns we are interested in here
 co2_fluxes_exp |>
-  select(f_fluxID, Tsoil, PAR, slope_co2, datetime, flux_co2, model_co2)
+  select(f_fluxID, Tsoil, PAR, f_slope_calc, datetime, flux, model)
 ```
 
 # CH~4~
@@ -317,15 +316,13 @@ ch4_fluxes_qua <- flux_calc(ch4_slopes_qua_flag,
                             cols_ave = c("Tsoil", "PAR"),
                             fluxid_col = "f_fluxID",
                             temp_air_col = "Tcham") |>
-  rename(
-    flux_ch4 = "flux", # to avoid any confusion later
-    model_ch4 = "model",
-    slope_ch4 = "f_slope_calc"
+  mutate(
+    gas = "CH4" # to avoid any confusion later
   )
 
 # printing the columns we are interested in here
 ch4_fluxes_qua |>
-  select(f_fluxID, Tsoil, PAR, slope_ch4, datetime, flux_ch4, model_ch4)
+  select(f_fluxID, Tsoil, PAR, f_slope_calc, datetime, flux, model)
 ```
 
 
@@ -443,27 +440,48 @@ n2o_fluxes_lin <- flux_calc(n2o_slopes_lin_flag,
                             cols_ave = c("Tsoil", "PAR"),
                             fluxid_col = "f_fluxID",
                             temp_air_col = "Tcham") |>
-  rename(
-    flux_n2o = "flux", # to avoid any confusion later
-    model_n2o = "model",
-    slope_n2o = "f_slope_calc"
+  mutate(
+    gas = "N2O" # to avoid any confusion later
   )
-
 # printing the columns we are interested in here
 n2o_fluxes_lin |>
-  select(f_fluxID, Tsoil, PAR, slope_n2o, datetime, flux_n2o, model_n2o)
+  select(f_fluxID, Tsoil, PAR, f_slope_calc, datetime, flux, model)
 ```
 
 
 <!-- ## Comparing the methods -->
 
 
-# Re merging the dataset
+# Merging the datasets
+Now we can merge the datasets back together.
+Since the `f_fluxID` (`ChamID` in the provided dataset, see the data preparation) for the different gases is the same, it is possible here to decide to drop the measurements in the other gases if one of them was bad quality.
 
-```{r }
+```{r merge_all, warning = FALSE, message = FALSE}
+all_fluxes <- bind_rows(co2_fluxes_exp, ch4_fluxes_qua, n2o_fluxes_lin) |>
+  filter(
+    f_fluxID != 6 # I am taking out fluxID 6 for now until
+    # Karelle confirms the chamber volume (too big to not be an error)
+  )
 
+all_fluxes |>
+  ggplot(aes(
+    y = flux,
+    x = f_fluxID
+  ))  +
+  geom_col() +
+  facet_wrap(.~gas, scales = "free") +
+  theme_bw() +
+  scale_x_continuous(breaks = c(1:7)) +
+  labs(
+    title = "Fluxes calculated with Fluxible",
+    x = "ChamID",
+    y = "Fluxes"
+  )
 ```
 
+```{r csv, include = FALSE}
 
+write_csv(all_fluxes, "fluxible_fluxes_workshop.csv")
+```
 
 ## References
