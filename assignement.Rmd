@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 )
 ```
 # About the Fluxible R package
-[The Fluxible R package](https://plant-functional-trait-course.github.io/fluxible/index.html) (@fluxible-dev) is designed to process ecosystem gas fluxes measurements from raw concentration over time measurements into a clean dataset of gas fluxes in a reproducible and automated method.
+[The Fluxible R package](https://plant-functional-trait-course.github.io/fluxible/index.html) (@gaudardFluxibleEcosystemGas2024) is designed to process ecosystem gas fluxes measurements from raw concentration over time measurements into a clean dataset of gas fluxes in a reproducible and automated method.
 The workflow includes both automated quality control and visual control by the user.
 For a quick overview of the workflow, a poster is available [here](https://github.com/Plant-Functional-Trait-Course/fluxible/blob/main/dissemination/poster_EGU24_jgaudard.pdf)
 
@@ -30,7 +30,7 @@ install.packages("fluxible")
 But the dataset provided in this exercise highlighted some issues.
 They were fixed in the devellopment version.
 We therefore recommend to install the devellopment version for this exercise.
-<!-- For this example we will use the devellopment version of Fluxible (@fluxible). -->
+<!-- For this example we will use the devellopment version of Fluxible (@gaudardFluxibleEcosystemGas2024). -->
 <!-- The dataset provided highlighted new issues (inconsistant time intervals in between gas concentration data points) that were fixed in the devellopment version. -->
 ```{r install-dev, warning = FALSE, message = FALSE}
 # install.packages("devtools")
@@ -485,12 +485,19 @@ Since the `f_fluxID` (`ChamID` in the provided dataset, see the data preparation
 all_fluxes <- bind_rows(co2_fluxes_exp, ch4_fluxes_qua, n2o_fluxes_lin)
 
 all_fluxes |>
+  mutate(
+    flux = case_when(
+      flux == 0 ~ 0.1, # to make the difference between NA and 0
+      flux != 0 ~ flux
+    )
+  ) |>
   ggplot(aes(
     y = flux,
     x = f_fluxID
   ))  +
-  geom_col() +
-  facet_wrap(.~gas, scales = "free") +
+  # geom_col(position = position_dodge2(preserve = "single", padding = 0.1)) +
+    geom_col(position = position_dodge(preserve = "single")) +
+  facet_wrap(.~gas, scales = "fixed") +
   theme_bw() +
   scale_x_continuous(breaks = c(1:7)) +
   labs(
