@@ -16,6 +16,8 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 ```
+
+<!-- Richard: add captions for figures explaining why it worked or not, less visible code -->
 # About the Fluxible R package
 [The Fluxible R package](https://plant-functional-trait-course.github.io/fluxible/index.html) (@gaudardFluxibleEcosystemGas2024) is designed to process ecosystem gas fluxes measurements from raw concentration over time measurements into a clean dataset of gas fluxes in a reproducible and automated method.
 The workflow includes both automated quality control and visual control by the user.
@@ -27,12 +29,12 @@ The Fluxible R package can be installed from CRAN:
 install.packages("fluxible")
 ```
 
-But the dataset provided in this exercise highlighted some issues.
-They were fixed in the devellopment version.
-We therefore recommend to install the devellopment version for this exercise.
+However the dataset provided in this exercise highlighted some issues.
+They were fixed in the development version.
+We therefore recommend to install the development version for this exercise.
 <!-- For this example we will use the devellopment version of Fluxible (@gaudardFluxibleEcosystemGas2024). -->
 <!-- The dataset provided highlighted new issues (inconsistant time intervals in between gas concentration data points) that were fixed in the devellopment version. -->
-```{r install-dev, warning = FALSE, message = FALSE}
+```{r install-dev, warning = FALSE, message = FALSE, results = "hide"}
 # install.packages("devtools")
 devtools::install_github("plant-functional-trait-course/fluxible")
 ```
@@ -46,30 +48,27 @@ In the dataset provided here, the measurements have different lengths, and were 
 It is therefore more challenging to treat the data in a homogeneous way.
 The dataset is also too short to be split, so we will just treat it as one.
 
-## Issues that were fixed in the devellopment version
+## Issues that were fixed in the development version
 The dataset provided here does not provide a gas concentration measurement at a constant frequency of 1 Hz.
 This caused the `flux_fitting` function to fail in some cases when using the exponential model.
 The linear and quadratic models work fine with the CRAN version because they were designed differently.
 
 
 # Preparing the data
+We will calculate the fluxes for each gases seperately and re assemble the dataset afterwards.
+The workflow with the Fluxible R package would normally starts with the `flux_match` function to attribute fluxID and meta data.
+We will skip this step because the dataset is already containing all the meta data we need (and fluxID as ChamID).
+Because we skipped `flux_match`, we are missine the columns `f_start` and `f_end` (which are the start and the end of the measurements).
+Let's just make them.
 
+It also appears that some gas concentration data points have the same datetime (most likely a rounding issue with the loggers).
+As it is impossible for a sample to have the two different concentration values at the same time, we will keep only the first row for each of those cases.
 ```{r load_data, warning = FALSE, message = FALSE}
 library(tidyverse)
 library(fluxible)
 
 all_measurements <- read_csv("data.csv")
 
-# str(all_measurements)
-```
-
-We will calculate the fluxes for each gases seperately and re assemble the dataset after wards, it might be easier.
-The workflow with the Fluxible R package would normally starts with the `flux_match` function to attribute fluxID and meta data.
-We will skip this step because the dataset is already containing all the meta data we need (and fluxID as ChamID).
-Because we skipped `flux_match`, we are missine the columns `f_start` and `f_end` (which are the start and the end of the measurements).
-Let's just make them.
-
-```{r add_cols}
 all_measurements <- all_measurements |>
   group_by(ChamID) |>
   mutate(
@@ -77,17 +76,16 @@ all_measurements <- all_measurements |>
     f_end = max(DATE_TIME),
     Area = Area * 0.0001 # we need the area in sqm
   ) |>
-  ungroup() |> # some measurement have the same datetime (logger issue?)
- # we just keep the first row for those overlapping measurement
+  ungroup() |> # some measurements have the same datetime (logger issue?)
+  # we just keep the first row for those overlapping measurement
   distinct(DATE_TIME, ChamID, .keep_all = TRUE)
-# str(all_measurements)
 ```
 
 # CO~2~
 
 ## Fitting models and estimating the slopes
 
-```{r co2_fitting}
+```{r co2_fitting, message = FALSE}
 co2_slopes_exp <- flux_fitting(
   conc_df = all_measurements,
   start_cut = 0,
@@ -99,8 +97,6 @@ co2_slopes_exp <- flux_fitting(
   fluxid_col = "ChamID",
   fit_type = "exponential"
 )
-
-# str(co2_slopes_exp)
 
 co2_slopes_qua <- flux_fitting(
   conc_df = all_measurements,
@@ -114,8 +110,6 @@ co2_slopes_qua <- flux_fitting(
   fit_type = "quadratic"
 )
 
-# str(co2_slopes_qua)
-
 co2_slopes_lin <- flux_fitting(
   conc_df = all_measurements,
   start_cut = 0,
@@ -127,8 +121,6 @@ co2_slopes_lin <- flux_fitting(
   fluxid_col = "ChamID",
   fit_type = "linear"
 )
-
-# str(co2_slopes_lin)
 ```
 
 ## Checking the quality
@@ -136,15 +128,9 @@ co2_slopes_lin <- flux_fitting(
 ```{r co2_quality}
 co2_slopes_exp_flag <- flux_quality(co2_slopes_exp)
 
-# str(co2_slopes_exp_flag)
-
 co2_slopes_qua_flag <- flux_quality(co2_slopes_qua)
 
-# str(co2_slopes_qua_flag)
-
 co2_slopes_lin_flag <- flux_quality(co2_slopes_lin)
-
-# str(co2_slopes_lin_flag)
 ```
 
 After adding the quality flags we can plot the fluxes to visually check them.
@@ -173,11 +159,11 @@ co2_slopes_lin_flag  |>
 ```
 It seems that we are getting the best fits with the exponential model.
 The exponential model we use here is described in @zhaoCalculationDaytimeCO22018.
-We could also try to cut the end or start (argument `end_cut` or `start_cut` in `flux_fitting`) of the measurements to improve the fits.
+We could also try to cut the end or start (arguments `end_cut` or `start_cut` in `flux_fitting`) of the measurements to improve the fits.
 
 ## Calculating the fluxes
 
-```{r co2_calc}
+```{r co2_calc, warning = FALSE, message = FALSE}
 co2_fluxes_exp <- flux_calc(co2_slopes_exp_flag,
                             slope_col = "f_slope_corr",
                             conc_unit = "ppm",
@@ -205,7 +191,7 @@ co2_fluxes_exp |>
 
 ## Fitting models and estimating the slopes
 
-```{r ch4_fitting}
+```{r ch4_fitting, warning = FALSE, message = FALSE}
 ch4_slopes_exp <- flux_fitting(
   conc_df = all_measurements,
   start_cut = 0,
@@ -217,8 +203,6 @@ ch4_slopes_exp <- flux_fitting(
   fluxid_col = "ChamID",
   fit_type = "exponential"
 )
-
-# str(ch4_slopes_exp)
 
 ch4_slopes_qua <- flux_fitting(
   conc_df = all_measurements,
@@ -232,8 +216,6 @@ ch4_slopes_qua <- flux_fitting(
   fit_type = "quadratic"
 )
 
-# str(ch4_slopes_qua)
-
 ch4_slopes_lin <- flux_fitting(
   conc_df = all_measurements,
   start_cut = 0,
@@ -245,8 +227,6 @@ ch4_slopes_lin <- flux_fitting(
   fluxid_col = "ChamID",
   fit_type = "linear"
 )
-
-# str(ch4_slopes_lin)
 ```
 
 ## Checking the quality
@@ -254,29 +234,23 @@ ch4_slopes_lin <- flux_fitting(
 We need to adjust the `ambient_conc` and `error` arguments because the defaults are for CO~2~.
 We do not have information about the ambient concentration at those sites, so for the sake of the example we took values based on the measurements themselves.
 
-```{r ch4_quality}
+```{r ch4_quality, warning = FALSE, message = FALSE}
 ch4_slopes_exp_flag <- flux_quality(ch4_slopes_exp,
                                     ambient_conc = 3,
                                     error = 5)
-
-# str(ch4_slopes_exp_flag)
 
 ch4_slopes_qua_flag <- flux_quality(ch4_slopes_qua,
                                     ambient_conc = 3,
                                     error = 5)
 
-# str(ch4_slopes_qua_flag)
-
 ch4_slopes_lin_flag <- flux_quality(ch4_slopes_lin,
                                     ambient_conc = 3,
                                     error = 5)
-
-# str(ch4_slopes_lin_flag)
 ```
 
 After adding the quality flags we can plot the fluxes to visually check them.
 
-```{r ch4_plot, fig.width = 8, fig.height = 9}
+```{r ch4_plot, fig.width = 8, fig.height = 9, echo = FALSE, warning = FALSE, message = FALSE}
 ch4_slopes_exp_flag  |>
   flux_plot(f_ylim_lower = 1,
             f_ylim_upper = 3,
@@ -298,20 +272,26 @@ ch4_slopes_lin_flag  |>
             y_text_position = 2.2,
             f_date_breaks = "2 min")
 ```
-Here we can use the quadratic model.
-It seems that `flux_quality` recommends to replace by zero the slopes of fluxID 5 and 6, but we could argue to keep them.
-It seems that the slopes still describe the flux well despite low R^2.
-FluxID 4 obviously had an issue (there is a high peak in the second half) and should not be kept, not even replaced by zero.
-For that we use the `force_ok_id` and `weird_fluxes_id` arguments in `flux_quality`.
+Small and flat fluxes like those here are more difficult to fit.
+Without knowing the context on the field and the gas analyzer used it is difficult to tell what happened with fluxID 4.
+We will discard it.
+FluxID 5 is badly cut.
+We could use the `end_cut` or `start_cut` arguments in `flux_fitting` if the dataset was homogeneous with measurements of equal length.
 
-```{r re_eval_ch4, fig.width = 8, fig.height = 9}
+<!-- Here we can use the quadratic model. -->
+<!-- It seems that `flux_quality` recommends to replace by zero the slopes of fluxID 5 and 6, but we could argue to keep them. -->
+We can use the quadratic model and the `force_ok_id` and `weird_fluxes_id` arguments in `flux_quality` to keep fluxID 5 and 6 and discard fluxID 4.
+It seems that the slopes still describe the flux well despite low R^2^ (which can be explained by the fact that those fluxes are very flat).
+<!-- FluxID 4 obviously had an issue (there is a high peak in the second half) and should not be kept, not even replaced by zero. -->
+<!-- For that we use the `force_ok_id` and `weird_fluxes_id` arguments in `flux_quality`. -->
+
+```{r re_eval_ch4, fig.width = 8, fig.height = 9, warning = FALSE, message = FALSE}
 ch4_slopes_qua_flag <- flux_quality(ch4_slopes_qua,
                                     ambient_conc = 3,
                                     error = 5,
                                     force_ok_id = c(5, 6),
                                     weird_fluxes_id = 4
                                     )
-# str(ch4_slopes_qua_flag)
 
 ch4_slopes_qua_flag  |>
   flux_plot(f_ylim_lower = 1,
@@ -323,7 +303,7 @@ ch4_slopes_qua_flag  |>
 
 ## Calculating the fluxes
 
-```{r ch4_calc}
+```{r ch4_calc, warning = FALSE, message = FALSE}
 ch4_fluxes_qua <- flux_calc(ch4_slopes_qua_flag,
                             slope_col = "f_slope_corr",
                             conc_unit = "ppm",
@@ -352,7 +332,7 @@ ch4_fluxes_qua |>
 
 ## Fitting models and estimating the slopes
 
-```{r n2o_fitting}
+```{r n2o_fitting, message = FALSE}
 n2o_slopes_exp <- flux_fitting(
   conc_df = all_measurements,
   start_cut = 0,
@@ -364,8 +344,6 @@ n2o_slopes_exp <- flux_fitting(
   fluxid_col = "ChamID",
   fit_type = "exponential"
 )
-
-# str(n2o_slopes_exp)
 
 n2o_slopes_qua <- flux_fitting(
   conc_df = all_measurements,
@@ -379,8 +357,6 @@ n2o_slopes_qua <- flux_fitting(
   fit_type = "quadratic"
 )
 
-# str(n2o_slopes_qua)
-
 n2o_slopes_lin <- flux_fitting(
   conc_df = all_measurements,
   start_cut = 0,
@@ -392,37 +368,29 @@ n2o_slopes_lin <- flux_fitting(
   fluxid_col = "ChamID",
   fit_type = "linear"
 )
-
-# str(n2o_slopes_lin)
 ```
 
 ## Checking the quality
 
 We need to adjust the `ambient_conc` and `error` arguments because the defaults are for CO~2~.
 We do not have information about the ambient concentration at those sites, so for the sake of the example we took values based on the measurements themselves.
-```{r n2o_quality}
+```{r n2o_quality, warning = FALSE}
 n2o_slopes_exp_flag <- flux_quality(n2o_slopes_exp,
                                     ambient_conc = 0.325,
                                     error = 0.05)
-
-# str(n2o_slopes_exp_flag)
 
 n2o_slopes_qua_flag <- flux_quality(n2o_slopes_qua,
                                     ambient_conc = 0.325,
                                     error = 0.05)
 
-# str(n2o_slopes_qua_flag)
-
 n2o_slopes_lin_flag <- flux_quality(n2o_slopes_lin,
                                     ambient_conc = 0.325,
                                     error = 0.05)
-
-# str(n2o_slopes_lin_flag)
 ```
 
 After adding the quality flags we can plot the fluxes to visually check them.
 
-```{r n2o_plot, fig.width = 8, fig.height = 9, warning = FALSE, message = FALSE}
+```{r n2o_plot, fig.width = 8, fig.height = 9, warning = FALSE, message = FALSE, echo = FALSE}
 n2o_slopes_exp_flag  |>
   flux_plot(f_ylim_lower = 0.3,
             f_ylim_upper = 0.4,
@@ -446,12 +414,30 @@ n2o_slopes_lin_flag  |>
 ```
 
 As I am not used to work with N~2~O, it is not possible for me to tell if this data quality is usual or not.
-I will just the linear fit, effectively replacing all slopes by zero.
+It seems that there is no change of concentration over time, and mostly noise was measured.
+It is also not possible to say what happened in fluxID 7 without the context (we could argue that it should be discarded).
+We could argue to use the quadratic fit and decrease the quality threshold for the R^2^.
+I do not have the expertise with N~2~O to make that decision, but it makes the example more intersting.
+
+```{r n2o_quality_2, warning = FALSE, fig.width = 8, fig.height = 9}
+n2o_slopes_qua_flag <- flux_quality(n2o_slopes_qua,
+                                    ambient_conc = 0.325,
+                                    error = 0.05,
+                                    rsquared_threshold = 0.1,
+                                    pvalue_threshold = 0.5)
+
+n2o_slopes_qua_flag  |>
+  flux_plot(f_ylim_lower = 0.3,
+            f_ylim_upper = 0.4,
+            facet_wrap_args = list(ncol = 2, scales = "free"),
+            y_text_position = 0.35,
+            f_date_breaks = "2 min")
+```
 
 ## Calculating the fluxes
 
-```{r n2o_calc}
-n2o_fluxes_lin <- flux_calc(n2o_slopes_lin_flag,
+```{r n2o_calc, warning = FALSE, message = FALSE}
+n2o_fluxes_qua <- flux_calc(n2o_slopes_qua_flag,
                             slope_col = "f_slope_corr",
                             conc_unit = "ppb",
                             flux_unit = "micromol",
@@ -463,13 +449,13 @@ n2o_fluxes_lin <- flux_calc(n2o_slopes_lin_flag,
                             fluxid_col = "f_fluxID",
                             temp_air_col = "Tcham")
 
-n2o_fluxes_lin <- n2o_fluxes_lin |>
+n2o_fluxes_qua <- n2o_fluxes_qua |>
   mutate(
     gas = "N2O", # to avoid any confusion later
     flux = flux * 1000 / 3600 # they want nmol/s/sqm
   )
 # printing the columns we are interested in here
-n2o_fluxes_lin |>
+n2o_fluxes_qua |>
   select(f_fluxID, Tsoil, PAR, f_slope_calc, datetime, flux, model)
 ```
 
@@ -481,13 +467,13 @@ n2o_fluxes_lin |>
 Now we can merge the datasets back together.
 Since the `f_fluxID` (`ChamID` in the provided dataset, see the data preparation) for the different gases is the same, it is possible here to decide to drop the measurements in the other gases if one of them was bad quality.
 
-```{r merge_all, warning = FALSE, message = FALSE}
-all_fluxes <- bind_rows(co2_fluxes_exp, ch4_fluxes_qua, n2o_fluxes_lin)
+```{r merge_all, warning = FALSE, message = FALSE, echo = FALSE}
+all_fluxes <- bind_rows(co2_fluxes_exp, ch4_fluxes_qua, n2o_fluxes_qua)
 
 all_fluxes |>
   mutate(
     flux = case_when(
-      flux == 0 ~ 0.1, # to make the difference between NA and 0
+      flux == 0 ~ 0.1, # to visualize the difference between NA and 0
       flux != 0 ~ flux
     )
   ) |>
@@ -495,15 +481,15 @@ all_fluxes |>
     y = flux,
     x = f_fluxID
   ))  +
-  # geom_col(position = position_dodge2(preserve = "single", padding = 0.1)) +
-    geom_col(position = position_dodge(preserve = "single")) +
-  facet_wrap(.~gas, scales = "fixed") +
+  geom_col(position = position_dodge(preserve = "single")) +
+  facet_wrap(.~gas, scales = "free") +
   theme_bw() +
   scale_x_continuous(breaks = c(1:7)) +
   labs(
     title = "Fluxes calculated with Fluxible",
     x = "ChamID",
-    y = "Fluxes"
+    y = "Fluxes",
+    caption = bquote("Fluxes are in [nmol/s/" * m^2 * "] for " ~ CH[4] ~ "and " ~ N[2] ~O ~ "; and [micromol/s/" * m^2 * "] for " ~ CO[2])
   )
 ```
 
