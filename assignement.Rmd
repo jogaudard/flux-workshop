@@ -21,7 +21,7 @@ knitr::opts_chunk$set(
 # About the Fluxible R package
 [The Fluxible R package](https://plant-functional-trait-course.github.io/fluxible/index.html) (@gaudardFluxibleEcosystemGas2024) is designed to process ecosystem gas fluxes measurements from raw concentration over time measurements into a clean dataset of gas fluxes in a reproducible and automated method.
 The workflow includes both automated quality control and visual control by the user.
-For a quick overview of the workflow, a poster is available [here](https://github.com/Plant-Functional-Trait-Course/fluxible/blob/main/dissemination/poster_EGU24_jgaudard.pdf)
+For a quick overview of the workflow, a poster is available on the github page [plant-functional-trait-course.github.io/fluxible](https://github.com/Plant-Functional-Trait-Course/fluxible/blob/main/dissemination/poster_EGU24_jgaudard.pdf)
 
 The Fluxible R package can be installed from CRAN:
 
@@ -58,11 +58,11 @@ The linear and quadratic models work fine with the CRAN version because they wer
 We will calculate the fluxes for each gases seperately and re assemble the dataset afterwards.
 The workflow with the Fluxible R package would normally starts with the `flux_match` function to attribute fluxID and meta data.
 We will skip this step because the dataset is already containing all the meta data we need (and fluxID as ChamID).
-Because we skipped `flux_match`, we are missine the columns `f_start` and `f_end` (which are the start and the end of the measurements).
+Because we skipped `flux_match`, we are missing the columns `f_start` and `f_end` (which are the start and the end of the measurements).
 Let's just make them.
 
 It also appears that some gas concentration data points have the same datetime (most likely a rounding issue with the loggers).
-As it is impossible for a sample to have the two different concentration values at the same time, we will keep only the first row for each of those cases.
+As it is impossible for a sample to have two different concentration values at the same time, we will keep only the first row for each of those cases.
 ```{r load_data, warning = FALSE, message = FALSE}
 library(tidyverse)
 library(fluxible)
@@ -417,7 +417,7 @@ As I am not used to work with N~2~O, it is not possible for me to tell if this d
 It seems that there is no change of concentration over time, and mostly noise was measured.
 It is also not possible to say what happened in fluxID 7 without the context (we could argue that it should be discarded).
 We could argue to use the quadratic fit and decrease the quality threshold for the R^2^.
-I do not have the expertise with N~2~O to make that decision, but it makes the example more intersting.
+I do not have enough expertise with N~2~O to make that decision, but it is a good example if how to use the Fluxible workflow.
 
 ```{r n2o_quality_2, warning = FALSE, fig.width = 8, fig.height = 9}
 n2o_slopes_qua_flag <- flux_quality(n2o_slopes_qua,
@@ -473,7 +473,8 @@ all_fluxes <- bind_rows(co2_fluxes_exp, ch4_fluxes_qua, n2o_fluxes_qua)
 all_fluxes |>
   mutate(
     flux = case_when(
-      flux == 0 ~ 0.1, # to visualize the difference between NA and 0
+      gas == "N2O" & flux == 0 ~ 0.000006, # to visualize the difference between NA and 0
+      gas == "CH4" & flux == 0 ~ 0.04, # to visualize the difference between NA and 0
       flux != 0 ~ flux
     )
   ) |>
